@@ -1,0 +1,757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ohm's Law Simulator — Live Circuit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #0A0E17;
+    --panel: #121A2B;
+    --panel-2: #0E1524;
+    --trace: #263854;
+    --cyan: #3ED6C5;
+    --amber: #F4A93C;
+    --hot: #FF6B4A;
+    --text: #E8EDF5;
+    --muted: #7C8AA5;
+    --lcd-bg: #0B140F;
+    --lcd-text: #7CFFB2;
+    --silver: #A9BEDD;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(ellipse at 20% -10%, rgba(62,214,197,0.08), transparent 55%),
+      radial-gradient(ellipse at 90% 110%, rgba(244,169,60,0.08), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter',sans-serif;
+    min-height:100vh;
+    padding:28px 16px 60px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+
+  header{margin-bottom:22px;}
+  .eyebrow{
+    font-family:'JetBrains Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.14em;
+    color:var(--cyan);
+    text-transform:uppercase;
+    margin-bottom:8px;
+  }
+  h1{
+    font-family:'Chakra Petch',sans-serif;
+    font-weight:700;
+    font-size:clamp(28px,5vw,42px);
+    margin:0 0 6px;
+    letter-spacing:0.01em;
+  }
+  header p{
+    color:var(--muted);
+    font-size:15px;
+    margin:0;
+    max-width:56ch;
+  }
+
+  .panel{
+    background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--trace);
+    border-radius:16px;
+    padding:22px;
+    margin-bottom:20px;
+    position:relative;
+    overflow:hidden;
+  }
+  .panel::before{
+    content:"";
+    position:absolute; inset:0;
+    background-image:
+      linear-gradient(var(--trace) 1px, transparent 1px),
+      linear-gradient(90deg, var(--trace) 1px, transparent 1px);
+    background-size:28px 28px;
+    opacity:0.08;
+    pointer-events:none;
+  }
+
+  .circuit-label{
+    font-family:'Chakra Petch',sans-serif;
+    font-size:13px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:0.1em;
+    margin-bottom:12px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .circuit-label .dot{
+    width:8px;height:8px;border-radius:50%;
+    background:var(--cyan);
+    box-shadow:0 0 8px var(--cyan);
+    display:inline-block;
+    margin-right:8px;
+  }
+  #soundToggle{
+    background:var(--panel-2);
+    border:1px solid var(--trace);
+    border-radius:8px;
+    width:32px;height:32px;
+    font-size:15px;
+    line-height:1;
+    cursor:pointer;
+    color:var(--text);
+    display:flex;align-items:center;justify-content:center;
+    padding:0;
+  }
+  #soundToggle:active{ transform:scale(0.94); }
+
+  svg{width:100%;height:auto;display:block;position:relative;}
+
+  .readouts{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:12px;
+    margin-top:18px;
+  }
+  .lcd{
+    background:var(--lcd-bg);
+    border:1px solid #1c2b20;
+    border-radius:10px;
+    padding:12px 14px;
+    box-shadow:inset 0 2px 8px rgba(0,0,0,0.5);
+  }
+  .lcd .k{
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;
+    color:#4a8b63;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+  }
+  .lcd .v{
+    font-family:'JetBrains Mono',monospace;
+    font-size:22px;
+    font-weight:700;
+    color:var(--lcd-text);
+    text-shadow:0 0 10px rgba(124,255,178,0.5);
+    margin-top:2px;
+  }
+  .lcd.current .v{ color:var(--amber); text-shadow:0 0 10px rgba(244,169,60,0.5);}
+  .lcd.speed .v{ color:var(--cyan); text-shadow:0 0 10px rgba(62,214,197,0.5);}
+
+  .formula{
+    text-align:center;
+    font-family:'JetBrains Mono',monospace;
+    font-size:14px;
+    color:var(--muted);
+    margin-top:14px;
+    letter-spacing:0.04em;
+  }
+  .formula b{color:var(--text);}
+
+  .controls{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:16px;
+  }
+  @media (max-width:760px){ .controls{grid-template-columns:1fr;} }
+  @media (max-width:560px){ .readouts{grid-template-columns:repeat(2,1fr);} }
+
+  .control{
+    background:linear-gradient(180deg,var(--panel),var(--panel-2));
+    border:1px solid var(--trace);
+    border-radius:14px;
+    padding:18px 20px 20px;
+  }
+  .control-head{
+    display:flex;justify-content:space-between;align-items:baseline;
+    margin-bottom:10px;
+  }
+  .control-head .name{
+    font-family:'Chakra Petch',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    color:var(--muted);
+  }
+  .control-head .val{
+    font-family:'JetBrains Mono',monospace;
+    font-weight:700;
+    font-size:20px;
+  }
+  .control.voltage .val{color:var(--cyan);}
+  .control.resistance .val{color:var(--amber);}
+
+  .slider-track{
+    position:relative;
+    width:100%;
+    height:28px;
+    margin-top:6px;
+    touch-action:none;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+  }
+  .slider-track::before{
+    content:"";
+    position:absolute;
+    left:0; right:0;
+    height:6px;
+    border-radius:4px;
+    background:#1c2740;
+  }
+  .slider-fill{
+    position:absolute;
+    left:0;
+    height:6px;
+    border-radius:4px;
+    width:50%;
+    pointer-events:none;
+  }
+  .control.voltage .slider-fill{ background:var(--cyan); }
+  .control.resistance .slider-fill{ background:var(--amber); }
+  .control.wire .slider-fill{ background:#B784F2; }
+  .control.wire .val{ color:#B784F2; }
+  .slider-thumb{
+    position:absolute;
+    left:50%;
+    width:24px;height:24px;
+    border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #fff, #cfd8e6 40%, #8b97ad);
+    border:3px solid var(--panel-2);
+    box-shadow:0 0 0 1px var(--trace), 0 2px 6px rgba(0,0,0,0.5);
+    transform:translateX(-50%);
+    touch-action:none;
+  }
+
+  .range-labels{
+    display:flex;justify-content:space-between;
+    font-family:'JetBrains Mono',monospace;
+    font-size:10px;color:var(--muted);
+    margin-top:6px;
+  }
+
+  .cta{
+    text-align:center;
+    margin-top:26px;
+    padding:18px;
+    border-radius:14px;
+    background:linear-gradient(135deg, rgba(62,214,197,0.08), rgba(244,169,60,0.08));
+    border:1px solid var(--trace);
+  }
+  .cta p{margin:0 0 4px;color:var(--text);font-size:14px;}
+  .cta span{color:var(--muted);font-size:12px;}
+  .follow-btn{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 22px;
+    border-radius:999px;
+    background:linear-gradient(135deg, #F4A93C, #FF6B4A, #B784F2);
+    color:#0A0E17;
+    font-family:'Chakra Petch',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    text-decoration:none;
+    letter-spacing:0.02em;
+    transition:transform 0.15s ease;
+  }
+  .follow-btn:active{ transform:scale(0.96); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">// Live Circuit Lab</div>
+    <h1>Ohm's Law Simulator</h1>
+    <p>Move the sliders to change voltage and resistance. Watch current flow through the wire in real time — brighter and faster flow means more current.</p>
+  </header>
+
+  <div class="panel">
+    <div class="circuit-label">
+      <span><span class="dot"></span>CIRCUIT VIEW</span>
+      <span style="display:flex;align-items:center;gap:14px;">
+        <span id="stateLabel">STEADY</span>
+        <button id="soundToggle" type="button" aria-label="Toggle sound">🔊</button>
+      </span>
+    </div>
+    <svg viewBox="0 0 600 340" id="circuitSvg">
+      <defs>
+        <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+          <feGaussianBlur stdDeviation="4" result="blur"/>
+          <feMerge>
+            <feMergeNode in="blur"/>
+            <feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+        <linearGradient id="battGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#3ED6C5"/>
+          <stop offset="100%" stop-color="#2A9D93"/>
+        </linearGradient>
+      </defs>
+
+      <!-- base wire loop (dim) -->
+      <path d="M100,270 L100,60 L250,60 L350,60 L500,60 L500,270 L100,270 Z"
+            fill="none" stroke="#26385480" stroke-width="6" stroke-linejoin="round"/>
+
+      <!-- animated current path (glow track, no dash movement — dots below carry the motion) -->
+      <path id="flowPath" d="M100,270 L100,60 L250,60 L350,60 L500,60 L500,270 L100,270 Z"
+            fill="none" stroke="#3ED6C5" stroke-width="3" stroke-linejoin="round"
+            opacity="0.55" filter="url(#glow)"/>
+
+      <!-- electron dots that travel along the loop -->
+      <g id="electrons"></g>
+
+      <!-- battery symbol on left wire -->
+      <g transform="translate(100,165)">
+        <rect x="-26" y="-4" width="52" height="8" fill="var(--panel)" />
+        <line x1="-18" y1="-22" x2="-18" y2="22" stroke="url(#battGrad)" stroke-width="6" stroke-linecap="round"/>
+        <line x1="10" y1="-12" x2="10" y2="12" stroke="url(#battGrad)" stroke-width="6" stroke-linecap="round"/>
+        <text x="-18" y="-30" text-anchor="middle" font-family="JetBrains Mono" font-size="14" fill="#3ED6C5">+</text>
+        <text x="10" y="-16" text-anchor="middle" font-family="JetBrains Mono" font-size="14" fill="#3ED6C5">−</text>
+        <text x="-4" y="45" text-anchor="middle" font-family="Chakra Petch" font-weight="600" font-size="13" fill="#7C8AA5">BATTERY</text>
+      </g>
+
+      <!-- resistor zigzag on top -->
+      <g transform="translate(300,60)">
+        <rect x="-52" y="-14" width="104" height="28" fill="var(--panel)"/>
+        <polyline id="resistorZig" points="-50,0 -38,-14 -26,14 -14,-14 -2,14 10,-14 22,14 34,-14 50,0"
+                  fill="none" stroke="#F4A93C" stroke-width="5" stroke-linejoin="round" stroke-linecap="round" filter="url(#glow)"/>
+        <text x="0" y="34" text-anchor="middle" font-family="Chakra Petch" font-weight="600" font-size="13" fill="#7C8AA5">RESISTOR</text>
+      </g>
+
+      <!-- ammeter on right wire -->
+      <g transform="translate(500,165)">
+        <circle r="22" fill="var(--panel)" stroke="#263854" stroke-width="2"/>
+        <text x="0" y="7" text-anchor="middle" font-family="Chakra Petch" font-weight="700" font-size="18" fill="#E8EDF5">A</text>
+        <text x="0" y="46" text-anchor="middle" font-family="Chakra Petch" font-weight="600" font-size="13" fill="#7C8AA5">AMMETER</text>
+      </g>
+    </svg>
+
+    <div class="readouts">
+      <div class="lcd"><div class="k">Voltage</div><div class="v" id="lcdV">12.0 V</div></div>
+      <div class="lcd"><div class="k">Resistance</div><div class="v" id="lcdR">100 Ω</div></div>
+      <div class="lcd current"><div class="k">Current</div><div class="v" id="lcdI">120 mA</div></div>
+      <div class="lcd speed"><div class="k">Drift Velocity</div><div class="v" id="lcdSpeed">0.88 mm/s</div></div>
+    </div>
+    <div class="formula">Ohm's Law: <b>V = I × R</b> &nbsp;→&nbsp; <b id="formulaLine">12.0 = 0.120 × 100</b></div>
+    <div class="formula" style="margin-top:6px;">Drift Velocity: <b>v_d = I ÷ (n·A·e)</b> &nbsp;→&nbsp; <b id="speedFormula">0.88 mm/s = 0.120 ÷ (8.5×10²⁸ × 7.85×10⁻⁷ × 1.6×10⁻¹⁹)</b></div>
+    <div class="formula" style="margin-top:4px;font-size:12px;opacity:0.75;">Copper wire assumed (n ≈ 8.5×10²⁸ electrons/m³). Real electrons crawl this slowly — the dots above move faster than reality purely so you can see the direction of flow.</div>
+  </div>
+
+  <div class="controls">
+    <div class="control voltage">
+      <div class="control-head"><span class="name">Voltage</span><span class="val" id="vVal">12.0 V</span></div>
+      <div class="slider-track" id="vTrack">
+        <div class="slider-fill" id="vFill"></div>
+        <div class="slider-thumb" id="vThumb"></div>
+      </div>
+      <div class="range-labels"><span>1 V</span><span>240 V</span></div>
+    </div>
+    <div class="control resistance">
+      <div class="control-head"><span class="name">Resistance</span><span class="val" id="rVal">100 Ω</span></div>
+      <div class="slider-track" id="rTrack">
+        <div class="slider-fill" id="rFill"></div>
+        <div class="slider-thumb" id="rThumb"></div>
+      </div>
+      <div class="range-labels"><span>1 Ω</span><span>10000 Ω</span></div>
+    </div>
+    <div class="control wire">
+      <div class="control-head"><span class="name">Wire Diameter</span><span class="val" id="dVal">1.0 mm</span></div>
+      <div class="slider-track" id="dTrack">
+        <div class="slider-fill" id="dFill"></div>
+        <div class="slider-thumb" id="dThumb"></div>
+      </div>
+      <div class="range-labels"><span>0.2 mm</span><span>4.0 mm</span></div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <p>Built for the Electrical Engineering + AI series</p>
+    <span>Change the sliders — the wire glow and resistor heat respond to real current values</span>
+    <div style="margin-top:14px;">
+      <a href="https://www.instagram.com/simulation_master?igsh=eXk0MTR3NzBlZnc4" target="_blank" rel="noopener" class="follow-btn">
+        📷 Follow @simulation_master
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+  const vTrack = document.getElementById('vTrack');
+  const vThumb = document.getElementById('vThumb');
+  const vFill = document.getElementById('vFill');
+  const rTrack = document.getElementById('rTrack');
+  const rThumb = document.getElementById('rThumb');
+  const rFill = document.getElementById('rFill');
+  const dTrack = document.getElementById('dTrack');
+  const dThumb = document.getElementById('dThumb');
+  const dFill = document.getElementById('dFill');
+  const dVal = document.getElementById('dVal');
+  const vVal = document.getElementById('vVal');
+  const rVal = document.getElementById('rVal');
+  const lcdV = document.getElementById('lcdV');
+  const lcdR = document.getElementById('lcdR');
+  const lcdI = document.getElementById('lcdI');
+  const lcdSpeed = document.getElementById('lcdSpeed');
+  const formulaLine = document.getElementById('formulaLine');
+  const speedFormula = document.getElementById('speedFormula');
+  const soundToggle = document.getElementById('soundToggle');
+  const flowPath = document.getElementById('flowPath');
+  const resistorZig = document.getElementById('resistorZig');
+  const stateLabel = document.getElementById('stateLabel');
+
+  function formatCurrent(amps){
+    if(amps >= 1) return amps.toFixed(3) + ' A';
+    if(amps >= 0.001) return (amps*1000).toFixed(1) + ' mA';
+    return (amps*1e6).toFixed(1) + ' µA';
+  }
+
+  // ---- Real electron drift velocity physics ----
+  // v_d = I / (n * A * e)
+  //   n = free electron density of copper (~8.5e28 electrons/m^3)
+  //   A = wire cross-sectional area in m^2 (from diameter)
+  //   e = elementary charge (1.602176634e-19 C)
+  const N_COPPER = 8.5e28;
+  const E_CHARGE = 1.602176634e-19;
+
+  function crossSectionArea(diameterMM){
+    const radiusM = (diameterMM / 1000) / 2;
+    return Math.PI * radiusM * radiusM;
+  }
+
+  function driftVelocity(amps, diameterMM){
+    const A = crossSectionArea(diameterMM);
+    return Math.abs(amps) / (N_COPPER * A * E_CHARGE); // m/s
+  }
+
+  function formatVelocity(v){
+    if (v >= 1) return v.toFixed(4) + ' m/s';
+    if (v >= 1e-3) return (v * 1e3).toFixed(3) + ' mm/s';
+    if (v >= 1e-6) return (v * 1e6).toFixed(3) + ' µm/s';
+    return (v * 1e9).toFixed(3) + ' nm/s';
+  }
+
+  function formatSci(n){
+    return n.toExponential(2).replace('e+', '×10^').replace('e-', '×10^-');
+  }
+
+  function lerpColor(c1, c2, t){
+    const a = parseInt(c1.slice(1),16), b = parseInt(c2.slice(1),16);
+    const ar=(a>>16)&255, ag=(a>>8)&255, ab=a&255;
+    const br=(b>>16)&255, bg=(b>>8)&255, bb=b&255;
+    const r=Math.round(ar+(br-ar)*t), g=Math.round(ag+(bg-ag)*t), bl=Math.round(ab+(bb-ab)*t);
+    return `rgb(${r},${g},${bl})`;
+  }
+
+  const electronsGroup = document.getElementById('electrons');
+  const NUM_ELECTRONS = 10;
+
+  // manually define the loop points (matches the path 'd' above) so we don't
+  // depend on SVG geometry APIs (getTotalLength/getPointAtLength), which some
+  // mobile browsers/webviews handle inconsistently.
+  const loopPoints = [
+    {x:100,y:270}, {x:100,y:60}, {x:250,y:60}, {x:350,y:60},
+    {x:500,y:60}, {x:500,y:270}, {x:100,y:270}
+  ];
+  const segLengths = [];
+  let pathLength = 0;
+  for (let i = 0; i < loopPoints.length - 1; i++) {
+    const dx = loopPoints[i+1].x - loopPoints[i].x;
+    const dy = loopPoints[i+1].y - loopPoints[i].y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    segLengths.push(len);
+    pathLength += len;
+  }
+
+  function getPointAtDistance(dist){
+    let remaining = ((dist % pathLength) + pathLength) % pathLength;
+    for (let i = 0; i < segLengths.length; i++) {
+      if (remaining <= segLengths[i]) {
+        const t = segLengths[i] === 0 ? 0 : remaining / segLengths[i];
+        const p0 = loopPoints[i], p1 = loopPoints[i+1];
+        return { x: p0.x + (p1.x - p0.x) * t, y: p0.y + (p1.y - p0.y) * t };
+      }
+      remaining -= segLengths[i];
+    }
+    return loopPoints[0];
+  }
+
+  const electrons = [];
+  for (let i = 0; i < NUM_ELECTRONS; i++) {
+    const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    dot.setAttribute('r', 5);
+    dot.setAttribute('fill', '#3ED6C5');
+    dot.setAttribute('filter', 'url(#glow)');
+    electronsGroup.appendChild(dot);
+    electrons.push({ el: dot, dist: (pathLength / NUM_ELECTRONS) * i });
+  }
+
+  // ---- Sound + haptics ----
+  let soundEnabled = true;
+  let audioCtx = null;
+  let noiseBuffer = null;
+  let humOsc = null, humFilter = null, humGain = null;
+  let hissSource = null, hissFilter = null, hissGain = null;
+  let sparkInterval = null;
+  let lastNorm = 0;
+  let lastStateWasHigh = false;
+
+  function ensureAudio(){
+    if (!audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return audioCtx;
+  }
+
+  function getNoiseBuffer(ctx){
+    if (noiseBuffer) return noiseBuffer;
+    const len = ctx.sampleRate * 2;
+    noiseBuffer = ctx.createBuffer(1, len, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    return noiseBuffer;
+  }
+
+  function playSpark(){
+    const ctx = ensureAudio();
+    if (!ctx || !soundEnabled) return;
+    const src = ctx.createBufferSource();
+    src.buffer = getNoiseBuffer(ctx);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1800 + Math.random() * 2200;
+    bp.Q.value = 6;
+    const g = ctx.createGain();
+    g.gain.value = 0.0001;
+    src.connect(bp).connect(g).connect(ctx.destination);
+    const t = ctx.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.18, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06 + Math.random() * 0.05);
+    src.start(t);
+    src.stop(t + 0.15);
+  }
+
+  function startHum(){
+    if (!soundEnabled) return;
+    const ctx = ensureAudio();
+    if (!ctx || humOsc) return;
+
+    // buzzy electric hum (sawtooth through a low-pass filter, more "electric" than a plain sine)
+    humOsc = ctx.createOscillator();
+    humFilter = ctx.createBiquadFilter();
+    humGain = ctx.createGain();
+    humOsc.type = 'sawtooth';
+    humFilter.type = 'lowpass';
+    humFilter.frequency.value = 400;
+    humGain.gain.value = 0.0001;
+    humOsc.connect(humFilter).connect(humGain).connect(ctx.destination);
+    humOsc.start();
+    humGain.gain.linearRampToValueAtTime(0.03, ctx.currentTime + 0.08);
+
+    // continuous electric hiss layer (filtered noise) that brightens with current
+    hissSource = ctx.createBufferSource();
+    hissSource.buffer = getNoiseBuffer(ctx);
+    hissSource.loop = true;
+    hissFilter = ctx.createBiquadFilter();
+    hissFilter.type = 'bandpass';
+    hissFilter.frequency.value = 900;
+    hissFilter.Q.value = 0.8;
+    hissGain = ctx.createGain();
+    hissGain.gain.value = 0.0001;
+    hissSource.connect(hissFilter).connect(hissGain).connect(ctx.destination);
+    hissSource.start();
+    hissGain.gain.linearRampToValueAtTime(0.012, ctx.currentTime + 0.08);
+
+    // random electrical crackle/sparks — more frequent as current rises
+    sparkInterval = setInterval(() => {
+      const chance = lastNorm * lastNorm * 0.6;
+      if (Math.random() < chance) playSpark();
+    }, 140);
+  }
+
+  function updateHum(norm){
+    if (!humOsc || !audioCtx) return;
+    const oscFreq = 70 + norm * 260; // low electrical buzz rising with current
+    humOsc.frequency.setTargetAtTime(oscFreq, audioCtx.currentTime, 0.08);
+    humFilter.frequency.setTargetAtTime(400 + norm * 3200, audioCtx.currentTime, 0.08);
+    humGain.gain.setTargetAtTime(0.02 + norm * 0.05, audioCtx.currentTime, 0.08);
+
+    if (hissFilter && hissGain) {
+      hissFilter.frequency.setTargetAtTime(700 + norm * 5000, audioCtx.currentTime, 0.08);
+      hissGain.gain.setTargetAtTime(0.005 + norm * 0.035, audioCtx.currentTime, 0.08);
+    }
+  }
+
+  function stopHum(){
+    if (sparkInterval) { clearInterval(sparkInterval); sparkInterval = null; }
+    if (humOsc) {
+      const osc = humOsc, gain = humGain;
+      humOsc = null; humGain = null; humFilter = null;
+      gain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 0.08);
+      setTimeout(() => { try { osc.stop(); osc.disconnect(); gain.disconnect(); } catch (e) {} }, 150);
+    }
+    if (hissSource) {
+      const src = hissSource, gain = hissGain;
+      hissSource = null; hissGain = null; hissFilter = null;
+      gain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 0.08);
+      setTimeout(() => { try { src.stop(); src.disconnect(); gain.disconnect(); } catch (e) {} }, 150);
+    }
+  }
+
+  function playTick(){
+    if (!soundEnabled) return;
+    const ctx = ensureAudio();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = 500;
+    gain.gain.value = 0.06;
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.08);
+    osc.stop(ctx.currentTime + 0.09);
+  }
+
+  function vibrate(pattern){
+    if (soundEnabled && navigator.vibrate) navigator.vibrate(pattern);
+  }
+
+  soundToggle.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    soundToggle.textContent = soundEnabled ? '🔊' : '🔇';
+    if (!soundEnabled) {
+      stopHum();
+    } else if (audioCtx) {
+      startHum();
+      updateHum(lastNorm);
+    }
+  });
+
+  const dragHooks = {
+    onStart(){ ensureAudio(); playTick(); vibrate(15); startHum(); },
+    onMove(){ /* volume/pitch updates happen inside update() via updateHum(norm) */ },
+    onEnd(){ /* hum keeps playing continuously, reflecting current at all times */ }
+  };
+
+  let currentV = 12;
+  let currentR = 100;
+  let currentD = 1.0; // wire diameter in mm
+
+  function makeSlider(track, thumb, fill, min, max, step, initial, onChange, hooks){
+    hooks = hooks || {};
+    function setFromValue(value){
+      value = Math.min(max, Math.max(min, value));
+      value = Math.round(value / step) * step;
+      const pct = ((value - min) / (max - min)) * 100;
+      thumb.style.left = pct + '%';
+      fill.style.width = pct + '%';
+      onChange(value);
+      return value;
+    }
+    function setFromClientX(clientX){
+      const rect = track.getBoundingClientRect();
+      let pct = (clientX - rect.left) / rect.width;
+      pct = Math.min(1, Math.max(0, pct));
+      const value = min + pct * (max - min);
+      return setFromValue(value);
+    }
+    let dragging = false;
+    track.addEventListener('pointerdown', (e) => {
+      dragging = true;
+      track.setPointerCapture(e.pointerId);
+      setFromClientX(e.clientX);
+      hooks.onStart && hooks.onStart();
+    });
+    track.addEventListener('pointermove', (e) => {
+      if (!dragging) return;
+      setFromClientX(e.clientX);
+      hooks.onMove && hooks.onMove();
+    });
+    track.addEventListener('pointerup', () => { dragging = false; hooks.onEnd && hooks.onEnd(); });
+    track.addEventListener('pointercancel', () => { dragging = false; hooks.onEnd && hooks.onEnd(); });
+
+    setFromValue(initial);
+    return { setFromValue };
+  }
+
+  function update(){
+    const V = currentV;
+    const R = currentR;
+    const I = V / R; // amps
+
+    vVal.textContent = V.toFixed(1) + ' V';
+    rVal.textContent = R.toFixed(0) + ' Ω';
+    lcdV.textContent = V.toFixed(1) + ' V';
+    lcdR.textContent = R.toFixed(0) + ' Ω';
+    lcdI.textContent = formatCurrent(I);
+    formulaLine.textContent = `${V.toFixed(1)} = ${I.toFixed(3)} × ${R.toFixed(0)}`;
+
+    // normalize current on log scale for visuals — range now spans ~0.0001A to ~240A
+    // (since V: 1-240, R: 1-10000)
+    const logI = Math.log10(Math.max(I, 0.0001));
+    const norm = Math.min(1, Math.max(0, (logI + 4) / 6.4));
+
+    // electron color + size + speed — all scale with current magnitude
+    const electronColor = lerpColor('#2A6E66', '#FF6B4A', norm);
+    electrons.forEach(e => {
+      e.el.setAttribute('fill', electronColor);
+      e.el.setAttribute('r', (3.5 + norm * 3).toFixed(1));
+    });
+    flowPath.setAttribute('stroke', electronColor);
+
+    // speed: distance per frame along the path — low current barely creeps, high current races
+    speed = 0.3 + norm * 9;
+    lastNorm = norm;
+    updateHum(norm);
+
+    // real electron drift velocity (physically accurate, uses wire cross-section)
+    const vd = driftVelocity(I, currentD);
+    lcdSpeed.textContent = formatVelocity(vd);
+    const A = crossSectionArea(currentD);
+    speedFormula.textContent = `${formatVelocity(vd)} = ${I.toFixed(3)} ÷ (${formatSci(N_COPPER)} × ${formatSci(A)} × ${formatSci(E_CHARGE)})`;
+
+    const isHigh = norm > 0.75;
+    if (isHigh && !lastStateWasHigh) vibrate([20, 40, 20]);
+    lastStateWasHigh = isHigh;
+
+    // resistor heat color based on power P = I^2 R (recalibrated for wider V/R range)
+    const P = I*I*R;
+    const logP = Math.log10(Math.max(P, 1e-8));
+    const pNorm = Math.min(1, Math.max(0, (logP + 6) / 11));
+    resistorZig.setAttribute('stroke', lerpColor('#3ED6C5', '#FF6B4A', pNorm));
+
+    stateLabel.textContent = norm > 0.75 ? 'HIGH CURRENT' : (norm > 0.35 ? 'ACTIVE' : 'STEADY');
+    stateLabel.style.color = norm > 0.75 ? '#FF6B4A' : (norm > 0.35 ? '#F4A93C' : '#7C8AA5');
+  }
+
+  function animate(){
+    electrons.forEach(e => {
+      e.dist = (e.dist + speed) % pathLength;
+      const pt = getPointAtDistance(e.dist);
+      e.el.setAttribute('cx', pt.x);
+      e.el.setAttribute('cy', pt.y);
+    });
+    requestAnimationFrame(animate);
+  }
+
+  var speed = 1; // distance units per frame, scales with current
+
+  makeSlider(vTrack, vThumb, vFill, 1, 240, 1, 12, (val) => { currentV = val; update(); }, dragHooks);
+  makeSlider(rTrack, rThumb, rFill, 1, 10000, 10, 100, (val) => { currentR = val; update(); }, dragHooks);
+  makeSlider(dTrack, dThumb, dFill, 0.2, 4.0, 0.1, 1.0, (val) => { currentD = val; dVal.textContent = val.toFixed(1) + ' mm'; update(); }, dragHooks);
+  update();
+  animate();
+</script>
+</body>
+</html>
